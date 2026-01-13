@@ -3,446 +3,394 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Trust Bank | Secure Portal</title>
+    <title>Nexus Cloud | Secure Enterprise Storage</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load sql.js for real SQL execution -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SQL.js for real in-memory SQLite execution -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+      }
+    }
+    </script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { background-color: #f8fafc; font-family: 'Inter', sans-serif; color: #1e293b; }
+        .login-card { background: white; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+        .input-std { background: #ffffff; border: 1px solid #cbd5e1; transition: all 0.2s; }
+        .input-std:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); outline: none; }
+        .hidden-screen { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         
-        :root {
-            --bank-blue: #0a2540;
-            --bank-gold: #c39d63;
-        }
-
-        body {
-            background-color: #f6f9fc;
-            font-family: 'Inter', sans-serif;
-            color: var(--bank-blue);
-            transition: all 0.3s ease;
-            overflow-x: hidden;
-        }
-
-        .login-card, .dashboard-card, .store-card {
-            background: white;
-            box-shadow: 0 50px 100px -20px rgba(50, 50, 93, 0.25), 0 30px 60px -30px rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            overflow: hidden;
-            border-top: 4px solid var(--bank-gold);
-        }
-
-        .input-field {
-            border: 1px solid #e6ebf1;
-            transition: border-color 0.2s;
-        }
-
-        .input-field:focus {
-            border-color: var(--bank-gold);
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(195, 157, 99, 0.2);
-        }
-
-        .hidden-view {
-            display: none !important;
-        }
-
-        .stat-card {
-            border-left: 4px solid var(--bank-gold);
-            background: #fdfdfd;
-        }
-
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--bank-blue);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .nav-link {
-            @apply px-4 py-2 rounded transition-colors text-sm font-medium cursor-pointer;
-        }
-        .nav-link.active {
-            @apply bg-white/10 text-white;
-        }
-        .nav-link:not(.active) {
-            @apply text-gray-400 hover:text-white;
-        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Bank Header -->
-    <header class="w-full bg-[#0a2540] text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-40">
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-[#c39d63] rounded-full flex items-center justify-center">
-                    <span class="font-bold text-[#0a2540]">GT</span>
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="flex-1 flex flex-col justify-center items-center p-6 bg-slate-50 overflow-y-auto">
+        <div class="max-w-md w-full login-card rounded-2xl p-8 md:p-10 fade-in my-auto">
+            <div class="mb-8 flex flex-col items-center text-center">
+                <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-xl shadow-blue-200">
+                    <i data-lucide="shield-check" class="text-white w-8 h-8"></i>
                 </div>
-                <span class="font-semibold tracking-tight text-lg">GLOBAL TRUST BANK</span>
-            </div>
-            
-            <!-- Navigation Tabs (Only visible when logged in) -->
-            <nav id="main-nav" class="hidden flex gap-2">
-                <div onclick="showView('dashboard')" id="nav-dashboard" class="nav-link active">DASHBOARD</div>
-                <div onclick="showView('store')" id="nav-store" class="nav-link">PREMIUM STORE</div>
-            </nav>
-        </div>
-
-        <div id="user-display" class="hidden text-sm flex items-center gap-6">
-            <div class="text-right">
-                <span class="text-gray-400 block text-[10px] font-bold uppercase">Available Funds</span>
-                <span id="header-balance" class="text-[#c39d63] font-mono font-bold">$0.00</span>
-            </div>
-            <div class="h-8 w-px bg-white/10"></div>
-            <span class="text-gray-400">User: <strong id="logged-in-user" class="text-white">---</strong></span>
-            <button onclick="logout()" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition-colors">LOGOUT</button>
-        </div>
-        <div id="version-display" class="text-xs uppercase tracking-widest text-gray-400 font-bold">
-            Portal v8.4.2
-        </div>
-    </header>
-
-    <main class="flex-1 flex items-center justify-center p-6">
-        
-        <!-- View 1: Login UI -->
-        <div id="login-view" class="login-card w-full max-w-md p-8">
-            <div class="mb-8 text-center">
-                <h2 class="text-2xl font-bold text-gray-800">Secure Sign In</h2>
-                <p class="text-sm text-gray-500 mt-1">Authorized Personnel Only</p>
+                <h2 id="auth-header" class="text-2xl font-bold text-slate-900 tracking-tight text-center">Nexus Secure Access</h2>
+                <p id="auth-sub-header" class="text-slate-500 text-sm mt-1">Enterprise Credential Gateway</p>
             </div>
 
             <div class="space-y-4">
+                <div id="sync-status" class="flex items-center gap-2 justify-center mb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div class="w-2 h-2 bg-amber-400 rounded-full animate-pulse" id="status-dot"></div>
+                    <span id="status-text">Synchronizing Database...</span>
+                </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Account ID</label>
-                    <input type="text" id="username" class="input-field w-full p-3 rounded" placeholder="Enter Account ID">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Username</label>
+                    <input type="text" id="user" class="input-std w-full p-3 rounded-xl text-slate-900" placeholder="admin">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Access PIN</label>
-                    <input type="password" id="password" class="input-field w-full p-3 rounded" placeholder="••••••••">
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Secret Key</label>
+                    <input type="password" id="pass" class="input-std w-full p-3 rounded-xl text-slate-900" placeholder="••••••••">
                 </div>
-                <button id="login-btn" class="w-full bg-[#0a2540] text-white font-bold py-3 rounded hover:bg-[#1a3a5a] transition-all mt-2 active:scale-95 disabled:opacity-50">
-                    <span id="btn-text">AUTHORIZE ACCESS</span>
+                
+                <button id="auth-btn" disabled class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold rounded-xl shadow-lg shadow-blue-100 transition-all flex justify-center items-center gap-2 mt-2">
+                    <span id="btn-text">Authenticate</span>
+                    <div id="loader" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 </button>
-            </div>
 
-            <div class="mt-6 pt-6 border-t border-gray-100 flex justify-between text-xs text-gray-400">
-                <a href="#" class="hover:underline">Encrypted Recovery</a>
-                <a href="#" class="hover:underline">Security Protocols</a>
-            </div>
-            <div id="error-msg" class="mt-4 text-center text-red-500 text-sm hidden">
-                Invalid credentials or system timeout.
+                <div class="text-center mt-4">
+                    <button id="toggle-auth-mode" class="text-sm font-medium text-blue-600 hover:text-blue-700">Need an account? Register Now</button>
+                </div>
+                
+                <p id="error-msg" class="text-red-500 text-xs font-medium mt-4 text-center opacity-0 transition-opacity h-4"></p>
+                <p id="success-msg" class="text-green-600 text-xs font-medium mt-4 text-center opacity-0 transition-opacity h-4"></p>
             </div>
         </div>
-
-        <!-- View 2: Post-Login Dashboard -->
-        <div id="dashboard-view" class="dashboard-card w-full max-w-4xl p-8 hidden-view">
-            <div class="flex justify-between items-end mb-8 border-b pb-6">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-800">Operational Dashboard</h2>
-                    <p class="text-gray-500">Global Asset Management & Vault Controls</p>
-                </div>
-                <div class="text-right">
-                    <span class="text-xs font-bold text-gray-400 block">LAST LOGIN</span>
-                    <span id="current-time" class="text-sm font-mono text-gray-700"></span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="stat-card p-4 rounded shadow-sm">
-                    <span class="text-xs text-gray-400 font-bold uppercase">Liquid Assets</span>
-                    <p id="stat-liquid-assets" class="text-2xl font-bold text-gray-800">$0.00</p>
-                </div>
-                <div class="stat-card p-4 rounded shadow-sm">
-                    <span class="text-xs text-gray-400 font-bold uppercase">Active Vaults</span>
-                    <p class="text-2xl font-bold text-gray-800">28</p>
-                </div>
-                <div class="stat-card p-4 rounded shadow-sm">
-                    <span class="text-xs text-gray-400 font-bold uppercase">System Status</span>
-                    <p class="text-2xl font-bold text-green-500">OPERATIONAL</p>
-                </div>
-            </div>
-
-            <div>
-                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                    Internal Audit: Restricted Database View
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
-                            <tr>
-                                <th class="p-3">UID</th>
-                                <th class="p-3">Label</th>
-                                <th class="p-3">Reference</th>
-                                <th class="p-3">Access Hash</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vault-table-body" class="divide-y divide-gray-100">
-                            <!-- Injected via SQL Result -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- View 3: Premium Store -->
-        <div id="store-view" class="store-card w-full max-w-5xl p-8 hidden-view">
-            <div class="mb-8 border-b pb-6">
-                <h2 class="text-3xl font-bold text-gray-800">Exclusive Luxury Marketplace</h2>
-                <p class="text-gray-500">Acquire elite assets using authorized account liquidities.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="store-items">
-                <!-- Items injected via JS -->
-            </div>
-        </div>
-    </main>
-
-    <footer class="p-6 text-center text-gray-400 text-[10px] uppercase tracking-widest">
-        &copy; 2026 Global Trust Financial Group. All Rights Reserved.
-    </footer>
-
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-10 right-10 transform translate-y-20 opacity-0 bg-gray-900 text-white px-6 py-3 rounded shadow-2xl transition-all duration-300 flex items-center gap-3 z-50">
-        <div id="toast-icon" class="w-2 h-2 rounded-full bg-green-500"></div>
-        <span id="toast-msg">Purchase Successful</span>
     </div>
 
-    <script>
-        let db;
-        let currentUser = null;
-        let userBalances = {}; // Format: { "username": amount }
-        
-        const views = {
-            login: document.getElementById('login-view'),
-            dashboard: document.getElementById('dashboard-view'),
-            store: document.getElementById('store-view')
-        };
-        
-        const storeItems = [
-            { id: 1, name: "Private Island (Maldives)", price: 15000000, img: "🏝️" },
-            { id: 2, name: "Gulfstream G700 Jet", price: 75000000, img: "✈️" },
-            { id: 3, name: "Superyacht 'The Kraken'", price: 250000000, img: "🛥️" },
-            { id: 4, name: "Penthouse (Manhattan)", price: 45000000, img: "🏙️" },
-            { id: 5, name: "10,000 BTC Voucher", price: 650000000, img: "🪙" },
-            { id: 6, name: "Luxury Watch Collection", price: 2500000, img: "⌚" }
-        ];
-
-        /**
-         * Persist balances to money.json
-         */
-        async function saveBalance() {
-            try {
-                await fetch('money.json', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userBalances)
-                });
-            } catch (err) {
-                console.warn("Storage unreachable, maintaining state in-memory.");
-            }
-        }
-
-        /**
-         * Load balances from money.json and ensure all users exist
-         */
-        async function loadBalances() {
-            try {
-                const response = await fetch('money.json');
-                if (response.ok) {
-                    const data = await response.json();
-                    userBalances = data || {};
-                }
-            } catch (err) {
-                console.log("No existing money.json found. Creating internal registry.");
-            }
-
-            // Expanded User list with real names
-            const users = [
-                'Arthur_Vance', 
-                'Elena_Rodriguez', 
-                'Marcus_Thorne', 
-                'Sophia_Chen', 
-                'David_Ames', 
-                'Isabella_Rossi',
-                'SYSTEM_ADMIN'
-            ];
-            
-            users.forEach(user => {
-                if (!(user in userBalances)) {
-                    userBalances[user] = 42901440.00; // Default starting balance
-                }
-            });
-            
-            await saveBalance(); // Update JSON with the full user list
-            updateUIBalance();
-        }
-
-        function showView(viewName) {
-            Object.keys(views).forEach(key => {
-                views[key].classList.add('hidden-view');
-            });
-            views[viewName].classList.remove('hidden-view');
-            
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            const activeNav = document.getElementById(`nav-${viewName}`);
-            if (activeNav) activeNav.classList.add('active');
-        }
-
-        function updateUIBalance() {
-            if (!currentUser) return;
-            const balance = userBalances[currentUser] || 0;
-            const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(balance);
-            document.getElementById('header-balance').innerText = formatted;
-            document.getElementById('stat-liquid-assets').innerText = formatted;
-        }
-
-        function showToast(msg, isError = false) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            document.getElementById('toast-icon').className = `w-2 h-2 rounded-full ${isError ? 'bg-red-500' : 'bg-green-500'}`;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
-        }
-
-        function buyItem(id) {
-            const item = storeItems.find(i => i.id === id);
-            if (userBalances[currentUser] >= item.price) {
-                userBalances[currentUser] -= item.price;
-                updateUIBalance();
-                saveBalance();
-                showToast(`Acquired: ${item.name}`);
-            } else {
-                showToast("Insufficient Liquidity in Account.", true);
-            }
-        }
-
-        function renderStore() {
-            const container = document.getElementById('store-items');
-            container.innerHTML = storeItems.map(item => `
-                <div class="border border-gray-100 rounded-lg p-6 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                    <div class="text-5xl mb-4">${item.img}</div>
-                    <h4 class="font-bold text-lg text-gray-800 mb-1">${item.name}</h4>
-                    <p class="text-[#c39d63] font-mono font-bold mb-6">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.price)}</p>
-                    <button onclick="buyItem(${item.id})" class="mt-auto w-full py-2 bg-[#0a2540] text-white text-xs font-bold rounded hover:bg-black transition-colors">INITIATE PURCHASE</button>
+    <!-- MAIN STORAGE OS -->
+    <div id="storage-screen" class="hidden-screen h-screen flex flex-col bg-white overflow-hidden fade-in">
+        <header class="h-16 flex-shrink-0 border-b border-slate-200 bg-white px-6 flex items-center justify-between z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
+                    <i data-lucide="cloud" class="text-white w-5 h-5"></i>
                 </div>
-            `).join('');
-        }
+                <h1 class="font-bold text-slate-900 tracking-tight text-lg">Nexus Drive</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="user-display" class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg">
+                    <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+                    <span id="logged-in-username" class="text-sm font-semibold text-slate-700">Guest</span>
+                </div>
+                <button id="logout-btn" class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-xl">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
 
-        async function initDatabase() {
-            const SQL = await initSqlJs({
-                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}`
-            });
-            db = new SQL.Database();
-            db.run("CREATE TABLE users (id INT, username TEXT, pin TEXT, role TEXT);");
-            db.run("CREATE TABLE vault_records (id TEXT, client TEXT, balance TEXT, secret TEXT);");
-            
-            // Expanded Personnel Roster
-            db.run("INSERT INTO users VALUES (1, 'Arthur_Vance', 'Vance_92', 'CHIEF_OPERATIONS');");
-            db.run("INSERT INTO users VALUES (2, 'Elena_Rodriguez', 'ER_2026!', 'SENIOR_AUDITOR');");
-            db.run("INSERT INTO users VALUES (3, 'Marcus_Thorne', 'Thorne_X', 'SECURITY_LEAD');");
-            db.run("INSERT INTO users VALUES (4, 'Sophia_Chen', 'Chen_88*', 'PORTFOLIO_MGR');");
-            db.run("INSERT INTO users VALUES (5, 'David_Ames', 'Ames_P@ss', 'SYSTEMS_ADMIN');");
-            db.run("INSERT INTO users VALUES (6, 'Isabella_Rossi', 'Rossi_99', 'COMPLIANCE');");
-            
-            // Expanded Client Vault Records
-            db.run("INSERT INTO vault_records VALUES ('TXN_4492', 'Michael Sterling', '$1,204,500', 'FLAG{REAL_SQL_BYPASS_SUCCESS}');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_8810', 'Vanessa Kross', '$12,000,000', 'VAULT_KEY_001');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_1102', 'Julian Thorne', '$5,400,000', 'VAULT_KEY_002');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_9921', 'Clarissa Vacker', '$850,220', 'VAULT_KEY_003');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_2003', 'Liam O''Connor', '$3,150,000', 'VAULT_KEY_004');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_5055', 'Sarah Jenkins', '$22,400,000', 'VAULT_KEY_005');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_7128', 'Hiroshi Tanaka', '$7,800,000', 'VAULT_KEY_006');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_3341', 'Amara Okafor', '$15,200,500', 'VAULT_KEY_007');");
-            
-            renderStore();
-            await loadBalances();
-        }
+        <main class="flex-1 bg-slate-50 flex overflow-hidden">
+            <aside class="w-72 border-r border-slate-200 bg-white flex flex-col">
+                <div class="p-4 border-b border-slate-100">
+                    <button id="new-file-btn" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-all shadow-md shadow-blue-100">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        New Document
+                    </button>
+                </div>
+                <div id="file-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <div class="flex flex-col items-center justify-center h-40 text-slate-400">
+                        <i data-lucide="files" class="w-8 h-8 mb-2 opacity-20"></i>
+                        <span class="text-xs">No files found</span>
+                    </div>
+                </div>
+            </aside>
 
-        function logout() {
-            currentUser = null;
-            showView('login');
-            document.getElementById('main-nav').classList.add('hidden');
-            document.getElementById('user-display').classList.add('hidden');
-            document.getElementById('version-display').classList.remove('hidden');
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-        }
+            <section class="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+                <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-center p-10">
+                    <div class="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+                         <i data-lucide="folder-lock" class="w-12 h-12 text-blue-600"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2">Private Workspace</h2>
+                    <p class="text-slate-500 max-w-sm">Files created here are only visible to your account.</p>
+                </div>
 
-        function populateDashboard(results) {
-            const tableBody = document.getElementById('vault-table-body');
-            tableBody.innerHTML = '';
-            if (!results || results.length === 0) return;
-            const values = results[0].values;
-            values.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition-colors";
-                tr.innerHTML = row.map(val => `<td class="p-3 font-mono text-gray-700">${val}</td>`).join('');
-                tableBody.appendChild(tr);
-            });
-        }
+                <div id="editor-screen" class="hidden-screen flex-1 flex flex-col fade-in">
+                    <div class="h-14 border-b border-slate-200 bg-white px-6 flex items-center justify-between">
+                        <input type="text" id="doc-title" class="bg-transparent border-none text-slate-900 font-semibold focus:outline-none w-1/2" placeholder="Untitled Document">
+                        <div class="flex items-center gap-3">
+                            <span id="save-status" class="text-[10px] uppercase font-bold text-slate-400 mr-2">Draft</span>
+                            <button id="save-file-btn" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-md hover:bg-blue-700 transition-all">
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex-1 p-8">
+                        <textarea id="doc-content" class="w-full h-full bg-white border border-slate-200 rounded-xl p-6 text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-100 shadow-sm" placeholder="Start typing..."></textarea>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
 
-        document.getElementById('login-btn').onclick = async () => {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const errorMsg = document.getElementById('error-msg');
-            const btnText = document.getElementById('btn-text');
-            const loginBtn = document.getElementById('login-btn');
+    <script type="module">
+        import { initializeApp } from "firebase/app";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
+        import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, serverTimestamp, doc, setDoc } from "firebase/firestore";
 
-            errorMsg.classList.add('hidden');
-            btnText.innerHTML = '<span class="loader"></span> VERIFYING...';
-            loginBtn.disabled = true;
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nexus-cloud-storage';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db_fs = getFirestore(app);
 
-            setTimeout(() => {
-                try {
-                    const query = `SELECT * FROM users WHERE username='${u}' AND pin='${p}'`;
-                    const res = db.exec(query);
+        let db_sql = null; 
+        let authMode = 'login';
+        let userAuthenticated = false;
+        let currentUserData = null;
+        let activeFileId = null;
+        let fileUnsubscribe = null;
 
-                    if (res.length > 0 && res[0].values.length > 0) {
-                        const userData = res[0].values[0];
-                        currentUser = userData[1]; // Set current user session
-                        
-                        // Handle cases where a SQL injection user isn't in our registry yet
-                        if (!(currentUser in userBalances)) {
-                            userBalances[currentUser] = 42901440.00;
-                            saveBalance();
-                        }
+        const getPublicCollection = (name) => collection(db_fs, 'artifacts', appId, 'public', 'data', name);
+        // Rule 1: Strict Paths for private data
+        const getPrivateCollection = (uid, name) => collection(db_fs, 'artifacts', appId, 'users', uid, name);
 
-                        document.getElementById('logged-in-user').innerText = currentUser.replace('_', ' ');
-                        
-                        const dashboardData = db.exec("SELECT * FROM vault_records LIMIT 4");
-                        populateDashboard(dashboardData);
+        const initSQL = async () => {
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
+            const authBtn = document.getElementById('auth-btn');
 
-                        document.getElementById('main-nav').classList.remove('hidden');
-                        document.getElementById('user-display').classList.remove('hidden');
-                        document.getElementById('version-display').classList.add('hidden');
-                        document.getElementById('current-time').innerText = new Date().toLocaleString();
-                        updateUIBalance();
-                        showView('dashboard');
-                    } else {
-                        errorMsg.classList.remove('hidden');
-                    }
-                } catch (e) {
-                    errorMsg.innerText = "Security Intercept: " + e.message;
-                    errorMsg.classList.remove('hidden');
-                } finally {
-                    btnText.innerText = 'AUTHORIZE ACCESS';
-                    loginBtn.disabled = false;
+            statusText.innerText = "Synchronizing Database...";
+            statusDot.className = "w-2 h-2 bg-amber-400 rounded-full animate-pulse";
+            authBtn.disabled = true;
+
+            try {
+                if (!db_sql) {
+                    const config = { locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${f}` };
+                    const SQL = await initSqlJs(config);
+                    db_sql = new SQL.Database();
                 }
-            }, 600);
+
+                db_sql.run("DROP TABLE IF EXISTS users;");
+                db_sql.run("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT);");
+                
+                const snapshot = await getDocs(getPublicCollection('users'));
+                let users = snapshot.docs.map(doc => doc.data());
+                
+                if (users.length === 0) {
+                    const initialAdmin = { username: 'nexus_admin', password: 'super_secret_99', role: 'ADMIN' };
+                    await addDoc(getPublicCollection('users'), initialAdmin);
+                    users = [initialAdmin];
+                }
+
+                users.forEach(u => {
+                    const stmt = db_sql.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+                    stmt.run([u.username, u.password, u.role || 'USER']);
+                    stmt.free();
+                });
+                
+                statusText.innerText = "System Ready";
+                statusDot.className = "w-2 h-2 bg-green-500 rounded-full";
+                authBtn.disabled = false;
+            } catch (err) {
+                console.error("Sync error:", err);
+                statusText.innerText = "Sync Error";
+                authBtn.disabled = false;
+            }
         };
 
-        initDatabase();
+        const setupFileListener = () => {
+            if (!auth.currentUser) return;
+            if (fileUnsubscribe) fileUnsubscribe();
+
+            const fileList = document.getElementById('file-list');
+            // Data isolation: only fetch from this specific user's folder
+            const q = query(getPrivateCollection(auth.currentUser.uid, 'files'));
+            
+            fileUnsubscribe = onSnapshot(q, (snapshot) => {
+                fileList.innerHTML = '';
+                if (snapshot.empty) {
+                    fileList.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-40 text-slate-400">
+                            <i data-lucide="files" class="w-8 h-8 mb-2 opacity-20"></i>
+                            <span class="text-xs">No files found</span>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                    return;
+                }
+
+                const files = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Rule 2: In-memory sorting
+                files.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+
+                files.forEach(file => {
+                    const item = document.createElement('button');
+                    item.className = `w-full text-left p-3 rounded-lg text-sm transition-all flex items-center gap-3 ${activeFileId === file.id ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100' : 'text-slate-600 hover:bg-slate-50'}`;
+                    item.innerHTML = `
+                        <i data-lucide="file-text" class="w-4 h-4 ${activeFileId === file.id ? 'text-blue-500' : 'text-slate-400'}"></i>
+                        <div class="flex-1 truncate">
+                            <div class="truncate font-medium">${file.title || 'Untitled'}</div>
+                            <div class="text-[10px] opacity-60">Private Document</div>
+                        </div>
+                    `;
+                    item.onclick = () => openFile(file);
+                    fileList.appendChild(item);
+                });
+                lucide.createIcons();
+            }, (error) => console.error("File sync error:", error));
+        };
+
+        const openFile = (file) => {
+            activeFileId = file.id;
+            document.getElementById('empty-state').classList.add('hidden-screen');
+            document.getElementById('editor-screen').classList.remove('hidden-screen');
+            document.getElementById('doc-title').value = file.title || '';
+            document.getElementById('doc-content').value = file.content || '';
+            document.getElementById('save-status').innerText = "Saved";
+            document.getElementById('save-status').className = "text-[10px] uppercase font-bold text-green-500 mr-2";
+        };
+
+        const createNewFile = () => {
+            activeFileId = null;
+            document.getElementById('empty-state').classList.add('hidden-screen');
+            document.getElementById('editor-screen').classList.remove('hidden-screen');
+            document.getElementById('doc-title').value = '';
+            document.getElementById('doc-content').value = '';
+            document.getElementById('save-status').innerText = "New Draft";
+            document.getElementById('save-status').className = "text-[10px] uppercase font-bold text-amber-500 mr-2";
+            document.getElementById('doc-title').focus();
+        };
+
+        const saveCurrentFile = async () => {
+            if (!auth.currentUser) return;
+            const title = document.getElementById('doc-title').value || 'Untitled Document';
+            const content = document.getElementById('doc-content').value;
+            const status = document.getElementById('save-status');
+
+            status.innerText = "Saving...";
+            status.className = "text-[10px] uppercase font-bold text-slate-400 mr-2 animate-pulse";
+
+            try {
+                const fileData = {
+                    title,
+                    content,
+                    owner: currentUserData.username,
+                    updatedAt: serverTimestamp()
+                };
+
+                if (activeFileId) {
+                    const docRef = doc(db_fs, 'artifacts', appId, 'users', auth.currentUser.uid, 'files', activeFileId);
+                    await setDoc(docRef, fileData, { merge: true });
+                } else {
+                    const res = await addDoc(getPrivateCollection(auth.currentUser.uid, 'files'), fileData);
+                    activeFileId = res.id;
+                }
+                
+                status.innerText = "Saved";
+                status.className = "text-[10px] uppercase font-bold text-green-500 mr-2";
+            } catch (e) {
+                console.error(e);
+                status.innerText = "Error";
+                status.className = "text-[10px] uppercase font-bold text-red-500 mr-2";
+            }
+        };
+
+        const handleAuth = async () => {
+            const u = document.getElementById('user').value;
+            const p = document.getElementById('pass').value;
+            const err = document.getElementById('error-msg');
+            const success = document.getElementById('success-msg');
+            const loader = document.getElementById('loader');
+            const authBtn = document.getElementById('auth-btn');
+
+            if (!u || !p) return;
+            authBtn.disabled = true;
+            loader.classList.remove('hidden');
+            err.style.opacity = '0';
+
+            try {
+                if (authMode === 'login') {
+                    const sql = `SELECT * FROM users WHERE username = '${u}' AND password = '${p}'`;
+                    const result = db_sql.exec(sql);
+
+                    if (result.length > 0 && result[0].values.length > 0) {
+                        enterSystem({ username: result[0].values[0][1] });
+                    } else {
+                        throw new Error("Invalid credentials.");
+                    }
+                } else {
+                    // Persistent username/password storage in Firestore
+                    await addDoc(getPublicCollection('users'), { 
+                        username: u, 
+                        password: p, 
+                        role: 'USER',
+                        createdAt: serverTimestamp() 
+                    });
+                    await initSQL();
+                    success.innerText = "Account Saved Successfully.";
+                    success.style.opacity = '1';
+                    setTimeout(toggleMode, 1000);
+                }
+            } catch (e) {
+                err.innerText = e.message;
+                err.style.opacity = '1';
+            } finally {
+                loader.classList.add('hidden');
+                if (authMode === 'login') authBtn.disabled = false;
+            }
+        };
+
+        const toggleMode = () => {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            document.getElementById('auth-header').innerText = authMode === 'login' ? "Nexus Secure Access" : "Register Account";
+            document.getElementById('btn-text').innerText = authMode === 'login' ? "Authenticate" : "Sign Up";
+            document.getElementById('toggle-auth-mode').innerText = authMode === 'login' ? "Need an account? Register Now" : "Already registered? Sign In";
+        };
+
+        const enterSystem = (user) => {
+            currentUserData = user;
+            document.getElementById('logged-in-username').innerText = user.username;
+            document.getElementById('auth-screen').classList.add('hidden-screen');
+            document.getElementById('storage-screen').classList.remove('hidden-screen');
+            setupFileListener();
+            lucide.createIcons();
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user && !userAuthenticated) {
+                userAuthenticated = true;
+                // Rule 3: Wait for auth before querying
+                await initSQL();
+            }
+        });
+
+        const startAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+
+        document.getElementById('auth-btn').addEventListener('click', handleAuth);
+        document.getElementById('toggle-auth-mode').addEventListener('click', toggleMode);
+        document.getElementById('logout-btn').addEventListener('click', () => location.reload());
+        document.getElementById('new-file-btn').addEventListener('click', createNewFile);
+        document.getElementById('save-file-btn').addEventListener('click', saveCurrentFile);
+
+        window.onload = () => {
+            lucide.createIcons();
+            startAuth();
+        };
     </script>
 </body>
 </html>
