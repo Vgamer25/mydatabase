@@ -145,7 +145,23 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
         import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, serverTimestamp, doc, setDoc } from "firebase/firestore";
 
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // Environment provided variables
+        const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Manual Firebase Configuration provided by user
+        const manualFirebaseConfig = {
+            apiKey: "AIzaSyAro3b5SzGR-zu76TLYUz939ZEOz4t5jRw",
+            authDomain: "mydatabase-907cd.firebaseapp.com",
+            projectId: "mydatabase-907cd",
+            storageBucket: "mydatabase-907cd.firebasestorage.app",
+            messagingSenderId: "419784219413",
+            appId: "1:419784219413:web:4c5df53551f4962f83271c",
+            measurementId: "G-PCBQ2WPTDG"
+        };
+
+        // Prefer environment config if available to prevent "configuration-not-found" errors in secure environments
+        const firebaseConfig = envFirebaseConfig || manualFirebaseConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'nexus-cloud-storage';
         
         const app = initializeApp(firebaseConfig);
@@ -160,7 +176,6 @@
         let fileUnsubscribe = null;
 
         const getPublicCollection = (name) => collection(db_fs, 'artifacts', appId, 'public', 'data', name);
-        // Rule 1: Strict Paths for private data
         const getPrivateCollection = (uid, name) => collection(db_fs, 'artifacts', appId, 'users', uid, name);
 
         const initSQL = async () => {
@@ -212,7 +227,6 @@
             if (fileUnsubscribe) fileUnsubscribe();
 
             const fileList = document.getElementById('file-list');
-            // Data isolation: only fetch from this specific user's folder
             const q = query(getPrivateCollection(auth.currentUser.uid, 'files'));
             
             fileUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -229,7 +243,6 @@
                 }
 
                 const files = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Rule 2: In-memory sorting
                 files.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
 
                 files.forEach(file => {
@@ -328,7 +341,6 @@
                         throw new Error("Invalid credentials.");
                     }
                 } else {
-                    // Persistent username/password storage in Firestore
                     await addDoc(getPublicCollection('users'), { 
                         username: u, 
                         password: p, 
@@ -368,16 +380,26 @@
         onAuthStateChanged(auth, async (user) => {
             if (user && !userAuthenticated) {
                 userAuthenticated = true;
-                // Rule 3: Wait for auth before querying
                 await initSQL();
             }
         });
 
         const startAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth initialization failed:", error);
+                // Fallback attempt with manual config if environment config fails
+                if (envFirebaseConfig) {
+                    console.log("Retrying with manual config...");
+                    const manualApp = initializeApp(manualFirebaseConfig, "fallback");
+                    const manualAuth = getAuth(manualApp);
+                    await signInAnonymously(manualAuth);
+                }
             }
         };
 
