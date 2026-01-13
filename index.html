@@ -164,7 +164,7 @@
                 </div>
                 <div class="stat-card p-4 rounded shadow-sm">
                     <span class="text-xs text-gray-400 font-bold uppercase">Active Vaults</span>
-                    <p class="text-2xl font-bold text-gray-800">14</p>
+                    <p class="text-2xl font-bold text-gray-800">28</p>
                 </div>
                 <div class="stat-card p-4 rounded shadow-sm">
                     <span class="text-xs text-gray-400 font-bold uppercase">System Status</span>
@@ -267,8 +267,17 @@
                 console.log("No existing money.json found. Creating internal registry.");
             }
 
-            // Ensure all users from our simulated DB are in the JSON storage
-            const users = ['admin_super', 'audit_internal', 'SYSTEM_ADMIN'];
+            // Expanded User list with real names
+            const users = [
+                'Arthur_Vance', 
+                'Elena_Rodriguez', 
+                'Marcus_Thorne', 
+                'Sophia_Chen', 
+                'David_Ames', 
+                'Isabella_Rossi',
+                'SYSTEM_ADMIN'
+            ];
+            
             users.forEach(user => {
                 if (!(user in userBalances)) {
                     userBalances[user] = 42901440.00; // Default starting balance
@@ -337,12 +346,25 @@
             db = new SQL.Database();
             db.run("CREATE TABLE users (id INT, username TEXT, pin TEXT, role TEXT);");
             db.run("CREATE TABLE vault_records (id TEXT, client TEXT, balance TEXT, secret TEXT);");
-            db.run("INSERT INTO users VALUES (1, 'admin_super', 'P@ssw0rd99!', 'SUPER_ADMIN');");
-            db.run("INSERT INTO users VALUES (2, 'audit_internal', '7721', 'AUDITOR');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_4492', 'John Doe', '$1,204,500', 'FLAG{REAL_SQL_BYPASS_SUCCESS}');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_8810', 'Swiss Trust', '$12,000,000', 'VAULT_KEY_001');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_1102', 'Ghost Account', '$5,400,000', 'VAULT_KEY_002');");
-            db.run("INSERT INTO vault_records VALUES ('TXN_9921', 'C. Vacker', '$850,220', 'VAULT_KEY_003');");
+            
+            // Expanded Personnel Roster
+            db.run("INSERT INTO users VALUES (1, 'Arthur_Vance', 'Vance_92', 'CHIEF_OPERATIONS');");
+            db.run("INSERT INTO users VALUES (2, 'Elena_Rodriguez', 'ER_2026!', 'SENIOR_AUDITOR');");
+            db.run("INSERT INTO users VALUES (3, 'Marcus_Thorne', 'Thorne_X', 'SECURITY_LEAD');");
+            db.run("INSERT INTO users VALUES (4, 'Sophia_Chen', 'Chen_88*', 'PORTFOLIO_MGR');");
+            db.run("INSERT INTO users VALUES (5, 'David_Ames', 'Ames_P@ss', 'SYSTEMS_ADMIN');");
+            db.run("INSERT INTO users VALUES (6, 'Isabella_Rossi', 'Rossi_99', 'COMPLIANCE');");
+            
+            // Expanded Client Vault Records
+            db.run("INSERT INTO vault_records VALUES ('TXN_4492', 'Michael Sterling', '$1,204,500', 'FLAG{REAL_SQL_BYPASS_SUCCESS}');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_8810', 'Vanessa Kross', '$12,000,000', 'VAULT_KEY_001');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_1102', 'Julian Thorne', '$5,400,000', 'VAULT_KEY_002');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_9921', 'Clarissa Vacker', '$850,220', 'VAULT_KEY_003');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_2003', 'Liam O''Connor', '$3,150,000', 'VAULT_KEY_004');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_5055', 'Sarah Jenkins', '$22,400,000', 'VAULT_KEY_005');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_7128', 'Hiroshi Tanaka', '$7,800,000', 'VAULT_KEY_006');");
+            db.run("INSERT INTO vault_records VALUES ('TXN_3341', 'Amara Okafor', '$15,200,500', 'VAULT_KEY_007');");
+            
             renderStore();
             await loadBalances();
         }
@@ -396,9 +418,9 @@
                             saveBalance();
                         }
 
-                        document.getElementById('logged-in-user').innerText = currentUser;
+                        document.getElementById('logged-in-user').innerText = currentUser.replace('_', ' ');
                         
-                        const dashboardData = db.exec("SELECT * FROM vault_records LIMIT 2");
+                        const dashboardData = db.exec("SELECT * FROM vault_records LIMIT 4");
                         populateDashboard(dashboardData);
 
                         document.getElementById('main-nav').classList.remove('hidden');
