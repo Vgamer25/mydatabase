@@ -186,32 +186,37 @@
             statusDot.className = "w-2 h-2 bg-amber-400 rounded-full animate-pulse";
             
             try {
+                // Initialize SQL.js engine if not exists
                 if (!db_sql) {
                     const config = { locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${f}` };
                     const SQL = await initSqlJs(config);
                     db_sql = new SQL.Database();
                 }
 
+                // Create table only if it doesn't exist
                 db_sql.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT);");
                 
-                // Clear existing table for fresh sync
-                db_sql.run("DELETE FROM users;");
-
+                // Fetch users from Firestore
                 const snapshot = await getDocs(getPublicCollection('users'));
                 let users = snapshot.docs.map(doc => doc.data());
                 
-                // If no users exist, seed the DB
                 if (users.length === 0) {
                     const initialAdmin = { username: 'admin', password: 'password', role: 'ADMIN' };
                     await addDoc(getPublicCollection('users'), initialAdmin);
                     users = [initialAdmin];
                 }
 
+                // BATCH SYNC: Use a transaction for much faster inserts
+                db_sql.run("BEGIN TRANSACTION;");
+                db_sql.run("DELETE FROM users;"); // Clear for fresh sync inside transaction
+                const stmt = db_sql.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+                
                 users.forEach(u => {
-                    const stmt = db_sql.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
                     stmt.run([u.username, u.password, u.role || 'USER']);
-                    stmt.free();
                 });
+                
+                stmt.free();
+                db_sql.run("COMMIT;");
                 
                 statusText.innerText = "System Ready";
                 statusDot.className = "w-2 h-2 bg-green-500 rounded-full";
@@ -220,7 +225,7 @@
                 console.error("Sync error:", err);
                 statusText.innerText = "Offline Mode Active";
                 statusDot.className = "w-2 h-2 bg-slate-400 rounded-full";
-                authBtn.disabled = false; // Enable anyway so user can try login
+                authBtn.disabled = false; 
             }
         };
 
@@ -320,12 +325,17 @@
 
             try {
                 if (authMode === 'login') {
-                    // Check local SQL DB
                     if (!db_sql) throw new Error("Database not ready.");
                     
-                    const result = db_sql.exec(`SELECT * FROM users WHERE username = '${u}' AND password = '${p}'`);
-                    if (result.length > 0 && result[0].values.length > 0) {
-                        enterSystem({ username: result[0].values[0][1] });
+                    // Simple Prepared Statement for security and speed
+                    const stmt = db_sql.prepare("SELECT * FROM users WHERE username = ? AND password = ?");
+                    stmt.bind([u, p]);
+                    const hasResult = stmt.step();
+                    const result = hasResult ? stmt.get() : null;
+                    stmt.free();
+
+                    if (result) {
+                        enterSystem({ username: result[1] });
                     } else {
                         throw new Error("Invalid credentials.");
                     }
@@ -370,7 +380,6 @@
                 }
             } catch (e) {
                 console.error("Auth initialization failed", e);
-                // Even if auth fails, let user try to interact with the UI
                 document.getElementById('status-text').innerText = "Auth Offline";
                 document.getElementById('auth-btn').disabled = false;
             }
@@ -399,14 +408,14 @@
             lucide.createIcons();
             startAuth();
             
-            // Safety: If after 5 seconds it's still disabled, force enable
+            // Safety fallback
             setTimeout(() => {
                 const btn = document.getElementById('auth-btn');
                 if (btn.disabled) {
                     btn.disabled = false;
-                    document.getElementById('status-text').innerText = "Connection Slow - Manual Entry Active";
+                    document.getElementById('status-text').innerText = "Manual Access Active";
                 }
-            }, 5000);
+            }, 3500);
         };
     </script>
 </body>
